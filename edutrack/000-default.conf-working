@@ -1,0 +1,21 @@
+<VirtualHost *:80>
+    ServerAdmin admin@yourdomain.com
+    DocumentRoot /var/www/html/public
+    ServerName yourdomain.com
+    ServerAlias www.yourdomain.com
+
+    <Directory /var/www/html/public>
+        AllowOverride All
+        Require all granted
+        Options Indexes FollowSymLinks
+    </Directory>
+
+    # Log Files (use stdout and stderr for Docker logging)
+    ErrorLog /dev/stderr
+    CustomLog /dev/stdout combined
+
+    # Security: Prevent access to hidden files (e.g., .htaccess, .env)
+    <FilesMatch "^\.">
+        Require all denied
+    </FilesMatch>
+</VirtualHost>

@@ -1,0 +1,58 @@
+# Use PHP 8.2 with Apache
+FROM php:8.2-apache
+
+# Enable Apache mod_rewrite
+RUN a2enmod rewrite
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    unzip \
+    curl \
+    git \
+    libpng-dev \
+    libonig-dev \
+    libxml2-dev \
+    zip \
+    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd
+
+# Install Composer
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+# Install Node.js & NPM (Needed for Vue)
+# Install Node.js 20 LTS & npm 10
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs && \
+    npm install -g npm@10
+
+
+# Copy Apache configuration file
+COPY 000-default.conf /etc/apache2/sites-available/000-default.conf
+
+# Set working directory
+WORKDIR /var/www/html
+
+# # Copy the application code to the container
+# COPY . .
+COPY --chown=www-data:www-data . .
+
+# Ensure script is executable
+RUN chmod +x docker-entrypoint.sh
+
+# Install PHP dependencies
+RUN composer install --no-dev --optimize-autoloader
+
+# This speeds up installation by using
+# the exact versions in package-lock.json.
+RUN npm ci && npm run build
+
+# Set final permissions AFTER generating new files
+RUN chown -R www-data:www-data /var/www/html && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+
+# Set entrypoint
+ENTRYPOINT ["/var/www/html/docker-entrypoint.sh"]
+
+# Expose port 80
+EXPOSE 80
+
+# Start Apache
+CMD ["apachectl", "-D", "FOREGROUND"]

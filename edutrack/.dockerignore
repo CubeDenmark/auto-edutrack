@@ -1,0 +1,12 @@
+node_modules
+vendor
+tests
+storage/logs
+storage/debugbar
+*.log
+*.zip
+*.gz
+.env*
+.git
+.dockerignore
+docker-compose.override.yml

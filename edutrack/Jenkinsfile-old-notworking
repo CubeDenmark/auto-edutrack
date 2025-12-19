@@ -1,0 +1,106 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_IMAGE_NAME = "makxies24/edutrack"
+        DOCKER_CREDENTIALS = 'dockerhub-credentials'
+        DOCKER_IMAGE_TAG = "${env.BUILD_NUMBER}"
+        COMPOSE_FILE = "docker-compose.yml"
+    }
+
+    stages {
+        stage('Clone Repository') {
+            steps {
+                script {
+                    checkout([
+                        $class: 'GitSCM',
+                        branches: [[name: 'main']],
+                        userRemoteConfigs: [[
+                            url: 'https://github.com/CubeDenmark/edutrack.git',
+                            credentialsId: 'github-pat'
+                        ]]
+                    ])
+                }
+            }
+        }
+
+        stage('Setup Application') {
+            steps {
+                script {
+                    sh '''
+                        # Ensure dependencies are installed
+                        # composer install --no-dev --optimize-autoloader
+                        composer install --optimize-autoloader
+                        npm install
+                        npm run build
+
+                        # Ensure correct environment variables
+                        cp .env.example .env
+                        php artisan config:clear
+                    '''
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    sh 'docker build --no-cache -t $DOCKER_IMAGE_NAME:$DOCKER_IMAGE_TAG -f Dockerfile .'
+                }
+            }
+        }
+
+        stage('Deploy Containers') {
+            steps {
+                script {
+                    sh '''
+                        docker compose down --remove-orphans
+                        cp .env .env
+                        docker compose up -d --build
+                    '''
+                }
+            }
+        }
+
+        stage('Run Migrations and Seeding') {
+            steps {
+                script {
+                    sh '''
+                        echo "Waiting for database to be ready..."
+                        for i in {1..10}; do
+                            if docker exec $(docker ps -qf "name=mariadb") mysql -uroot -e "use edutrack"; then
+                                echo "Database is ready.";
+                                break;
+                            fi;
+                            echo "Waiting... ($i)"
+                            sleep 5;
+                        done;
+
+                        docker exec $(docker ps -qf "name=edutrack-container") php artisan migrate --force
+                        docker exec $(docker ps -qf "name=edutrack-container") php artisan db:seed --class=UserSeeder --force || echo "Skipping seeding..."
+                        docker exec $(docker ps -qf "name=edutrack-container") php artisan storage:link
+                    '''
+                }
+            }
+        }
+
+        // stage('Run Tests') {
+        //     steps {
+        //         script {
+        //             sh 'docker exec $(docker ps -qf "name=edutrack-container") php artisan test'
+        //         }
+        //     }
+        // }
+
+        stage('Push to Docker Hub') {
+            steps {
+                script {
+                    withCredentials([usernamePassword(credentialsId: "$DOCKER_CREDENTIALS", usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
+                        sh 'echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin'
+                    }
+                    sh 'docker push $DOCKER_IMAGE_NAME:$DOCKER_IMAGE_TAG'
+                }
+            }
+        }
+    }
+}

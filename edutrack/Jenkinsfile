@@ -1,0 +1,432 @@
+pipeline {
+    // the agent  we use is 'any' which means it will use the first available agent
+    agent any  // Run on any available Jenkins agent
+
+    environment {
+        DOCKER_IMAGE_NAME = "makxies24/edutrack"
+        DOCKER_CREDENTIALS = 'dockerhub-credentials'
+        DOCKER_IMAGE_TAG = "${env.BUILD_NUMBER}"
+        COMPOSE_FILE = "docker-compose.yml"
+        CONTAINER_NAME = "edutrack-container"
+    }
+
+    stages {
+        stage('Checkout Code') {
+            steps {
+                checkout scm
+            }
+        }
+
+        // Working but more complex
+        // stage('Clone Repository') {
+        //     steps {
+        //         script {
+        //             checkout([
+        //                 $class: 'GitSCM',
+        //                 branches: [[name: 'main']],
+        //                 userRemoteConfigs: [[
+        //                     url: 'https://github.com/CubeDenmark/edutrack.git',
+        //                     credentialsId: 'github-pat'
+        //                 ]]
+        //             ])
+        //         }
+        //     }
+        // }
+
+       stage('Deploy') {
+            steps {
+                script {
+                    sh """
+                        echo "📦 Building Docker images (only if changes are detected)..."
+                        docker compose -f ${COMPOSE_FILE} build --no-cache
+
+                        echo "🚀 Starting containers (without wiping volumes)..."
+                        docker compose -f ${COMPOSE_FILE} up -d
+                    """
+
+                    timeout(time: 120, unit: 'SECONDS') {
+                        waitUntil {
+                            def status = sh(script: "docker inspect -f '{{.State.Status}}' ${CONTAINER_NAME}", returnStdout: true).trim()
+                            return status == "running"
+                        }
+                    }
+
+                    timeout(time: 120, unit: 'SECONDS') {
+                        waitUntil {
+                            def appReady = sh(script: "docker exec ${CONTAINER_NAME} curl -ks -o /dev/null -w '%{http_code}' https://localhost || true", returnStdout: true).trim()
+                            return appReady == "200"
+                        }
+                    }
+
+                    echo "✅ Edutrack is up and running with HTTPS!"
+                }
+            }
+        }
+
+        stage('Send Email') {
+            steps {
+                script {
+                    def ngrok_url = "https://edutrack.space"
+
+                    sh """
+                        docker exec ${CONTAINER_NAME} php artisan config:clear
+                        docker exec ${CONTAINER_NAME} php artisan cache:clear
+                    """
+
+                    sh "docker exec ${CONTAINER_NAME} php artisan ngrok:send-url --url='${ngrok_url}'"
+                }
+            }
+        }
+
+
+        // stage('Fetch Ngrok URL and Send Email') {
+        //     steps {
+        //         script {
+        //             // Retry fetching Ngrok URL up to 5 times
+        //             def ngrok_url = ""
+        //             for (int i = 0; i < 5; i++) {
+        //                 ngrok_url = sh(script: """
+        //                     curl --silent http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[] | select(.name == "edutrack") | .public_url'
+        //                 """, returnStdout: true).trim()
+
+        //                 if (ngrok_url && ngrok_url.startsWith("http")) {
+        //                     echo "✅ Edutrack Ngrok URL fetched: ${ngrok_url}"
+        //                     break
+        //                 } else {
+        //                     echo "⚠️ Ngrok URL not available yet. Retrying in 5 seconds..."
+        //                     sleep(5)
+        //                 }
+        //             }
+
+        //             if (!ngrok_url || !ngrok_url.startsWith("http")) {
+        //                 error("🚨 Failed to fetch Edutrack Ngrok URL after multiple attempts!")
+        //             }
+
+        //             // Run Laravel cache commands inside the container before sending the email
+        //             sh """
+        //                 docker exec ${CONTAINER_NAME} php artisan config:clear
+        //                 docker exec ${CONTAINER_NAME} php artisan cache:clear
+        //                 docker exec ${CONTAINER_NAME} php artisan route:cache
+        //             """
+
+        //             // Run Laravel command inside the container to send the URL
+        //             sh "docker exec ${CONTAINER_NAME} php artisan ngrok:send-url --url='${ngrok_url}'"
+        //         }
+        //     }
+        // }
+
+    }
+}
+
+
+
+
+// v1.3 working just and error on sending
+// pipeline {
+//     agent any  // Run on any available Jenkins agent
+
+//     environment {
+//         DOCKER_IMAGE_NAME = "makxies24/edutrack"
+//         DOCKER_CREDENTIALS = 'dockerhub-credentials'
+//         DOCKER_IMAGE_TAG = "${env.BUILD_NUMBER}"
+//         COMPOSE_FILE = "docker-compose.yml"
+//         CONTAINER_NAME = "edutrack-container"
+//     }
+
+//     stages {
+//         stage('Clone Repository') {
+//             steps {
+//                 script {
+//                     checkout([
+//                         $class: 'GitSCM',
+//                         branches: [[name: 'main']],
+//                         userRemoteConfigs: [[
+//                             url: 'https://github.com/CubeDenmark/edutrack.git',
+//                             credentialsId: 'github-pat'
+//                         ]]
+//                     ])
+//                 }
+//             }
+//         }
+
+//         stage('Deploy') {
+//             steps {
+//                 script {
+//                     sh """
+//                         docker compose -f ${COMPOSE_FILE} down --rmi all --volumes --remove-orphans
+//                         docker compose -f ${COMPOSE_FILE} up -d --build
+//                     """
+
+//                     // Wait for the container to be fully running
+//                     timeout(time: 30, unit: 'SECONDS') {
+//                         waitUntil {
+//                             def isRunning = sh(script: "docker ps --filter 'name=${CONTAINER_NAME}' --format '{{.Names}}'", returnStdout: true).trim()
+//                             return (isRunning == "${CONTAINER_NAME}")
+//                         }
+//                     }
+//                 }
+//             }
+//         }
+
+//         stage('Fetch Ngrok URL and Send Email') {
+//             steps {
+//                 script {
+//                     // Retry fetching Ngrok URL up to 5 times
+//                     def ngrok_url = ""
+//                     for (int i = 0; i < 5; i++) {
+//                         ngrok_url = sh(script: "curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url'", returnStdout: true).trim()
+
+//                         if (ngrok_url && ngrok_url.startsWith("http")) {
+//                             echo "✅ Ngrok URL fetched: ${ngrok_url}"
+//                             break
+//                         } else {
+//                             echo "⚠️ Ngrok URL not available yet. Retrying in 5 seconds..."
+//                             sleep(5)
+//                         }
+//                     }
+
+//                     if (!ngrok_url || !ngrok_url.startsWith("http")) {
+//                         error("🚨 Failed to fetch Ngrok URL after multiple attempts!")
+//                     }
+
+//                     // Pass the Ngrok URL to Laravel inside the running container
+//                     sh "docker exec ${CONTAINER_NAME} php artisan ngrok:send-url --url='${ngrok_url}'"
+//                 }
+//             }
+//         }
+//     }
+// }
+
+
+
+
+
+
+
+// v1.2 Working
+// pipeline {
+//     agent any  // Run on any available Jenkins agent
+
+//     environment {
+//         DOCKER_IMAGE_NAME = "makxies24/edutrack"
+//         DOCKER_CREDENTIALS = 'dockerhub-credentials'
+//         DOCKER_IMAGE_TAG = "${env.BUILD_NUMBER}"
+//         COMPOSE_FILE = "docker-compose.yml"
+//     }
+
+//     stages {
+//         stage('Clone Repository') {
+//             steps {
+//                 script {
+//                     checkout([
+//                         $class: 'GitSCM',
+//                         branches: [[name: 'main']],
+//                         userRemoteConfigs: [[
+//                             url: 'https://github.com/CubeDenmark/edutrack.git',
+//                             credentialsId: 'github-pat'
+//                         ]]
+//                     ])
+//                 }
+//             }
+//         }
+
+//         stage('Deploy') {
+//             steps {
+//                 script {
+//                     sh """
+//                         docker compose -f ${COMPOSE_FILE} down --rmi all --volumes --remove-orphans
+//                         docker compose -f ${COMPOSE_FILE} up -d --build
+//                     """
+//                 }
+//             }
+//         }
+
+//         // stage('Fetch Ngrok URL and Send Email') {
+//         //     steps {
+//         //         script {
+//         //             // Fetch Ngrok URL from the host machine
+//         //             def ngrok_url = sh(script: "curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url'", returnStdout: true).trim()
+
+//         //             // Pass the Ngrok URL as an environment variable to the Laravel container
+//         //             sh """
+//         //                 docker exec -it edutrack-container bash -c 'export NGROK_URL=${ngrok_url} && php artisan ngrok:send-url'
+//         //             """
+//         //         }
+//         //     }
+//         // }
+//     }
+// }
+
+
+
+
+// v1.1 Working
+// pipeline {
+//     agent any  // Run on any available Jenkins agent
+
+//     environment {
+//         DOCKER_IMAGE_NAME = "makxies24/edutrack"
+//         DOCKER_CREDENTIALS = 'dockerhub-credentials'
+//         DOCKER_IMAGE_TAG = "${env.BUILD_NUMBER}"
+//         COMPOSE_FILE = "docker-compose.yml"
+//     }
+
+//     stages {
+//         stage('Clone Repository') {
+//             steps {
+//                 script {
+//                     checkout([
+//                         $class: 'GitSCM',
+//                         branches: [[name: 'main']],
+//                         userRemoteConfigs: [[
+//                             url: 'https://github.com/CubeDenmark/edutrack.git',
+//                             credentialsId: 'github-pat'
+//                         ]]
+//                     ])
+//                 }
+//             }
+//         }
+
+//         // --volumes
+//         stage('Deploy') {
+//             steps {
+//                 script {
+//                     sh """
+//                         docker compose -f ${COMPOSE_FILE} down --rmi all --remove-orphans
+//                         docker compose -f ${COMPOSE_FILE} up -d --build
+//                     """
+//                 }
+//             }
+//         }
+
+//         // stage('Send Ngrok URL') {
+//         //     steps {
+//         //         script {
+//         //             sh "php artisan ngrok:send-url"
+//         //         }
+//         //     }
+//         // }
+
+//         // stage('Push to Docker Hub') {
+//         //     steps {
+//         //         script {
+//         //             withDockerRegistry([credentialsId: "${DOCKER_CREDENTIALS}", url: '']) {
+//         //                 sh """
+//         //                     # Ensure the image exists before pushing
+//         //                     docker images | grep "${DOCKER_IMAGE_NAME}" || (echo "Image build failed. Check Docker Compose." && exit 1)
+
+//         //                     # Tag the image
+//         //                     docker tag ${DOCKER_IMAGE_NAME}:${BUILD_NUMBER} ${DOCKER_IMAGE_NAME}:latest
+
+//         //                     # Push to Docker Hub
+//         //                     docker push ${DOCKER_IMAGE_NAME}:${BUILD_NUMBER}
+//         //                     docker push ${DOCKER_IMAGE_NAME}:latest
+//         //                 """
+//         //             }
+//         //         }
+//         //     }
+//         // }
+
+//     }
+// }
+
+
+
+
+// v1.0 works but have error
+// pipeline {
+//     agent any  // Run on any available Jenkins agent
+
+//     environment {
+//         DOCKER_IMAGE_NAME = "makxies24/edutrack"
+//         DOCKER_CREDENTIALS = 'dockerhub-credentials'
+//         DOCKER_IMAGE_TAG = "${env.BUILD_NUMBER}"
+//         COMPOSE_FILE = "docker-compose.yml"
+//     }
+
+//     stages {
+//         stage('Clone Repository') {
+//             steps {
+//                 script {
+//                     checkout([
+//                         $class: 'GitSCM',
+//                         branches: [[name: 'main']],
+//                         userRemoteConfigs: [[
+//                             url: 'https://github.com/CubeDenmark/edutrack.git',
+//                             credentialsId: 'github-pat'
+//                         ]]
+//                     ])
+//                 }
+//             }
+//         }
+
+//         // stage('Run Tests') {
+//         //     steps {
+//         //         script {
+//         //             sh """
+//         //                 docker run --rm ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG} npm test
+//         //             """
+//         //         }
+//         //     }
+//         // }
+
+//         // stage('Push to Docker Hub') {
+//         //     steps {
+//         //         script {
+//         //             withDockerRegistry([credentialsId: "${DOCKER_CREDENTIALS}", url: '']) {
+//         //                 sh """
+//         //                     docker tag ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG} ${DOCKER_IMAGE_NAME}:latest
+//         //                     docker push ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG}
+//         //                     docker push ${DOCKER_IMAGE_NAME}:latest
+//         //                 """
+//         //             }
+//         //         }
+//         //     }
+//         // }
+
+//         stage('Deploy') {
+//             steps {
+//                 script {
+//                     sh """
+//                         docker compose -f ${COMPOSE_FILE} down --rmi all --volumes --remove-orphans
+//                         docker compose -f ${COMPOSE_FILE} up -d --build
+//                     """
+//                 }
+//             }
+//         }
+
+//         // stage('Push to Docker Hub') {
+//         //     steps {
+//         //         script {
+//         //             withDockerRegistry([credentialsId: "${DOCKER_CREDENTIALS}", url: '']) {
+//         //                 sh """
+//         //                     docker tag ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG} ${DOCKER_IMAGE_NAME}:latest
+//         //                     docker push ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG}
+//         //                     docker push ${DOCKER_IMAGE_NAME}:latest
+//         //                 """
+//         //             }
+//         //         }
+//         //     }
+//         // }
+//         stage('Push to Docker Hub') {
+//             steps {
+//                 script {
+//                     withDockerRegistry([credentialsId: "${DOCKER_CREDENTIALS}", url: '']) {
+//                         sh """
+//                             # Ensure the image exists before pushing
+//                             docker images | grep "${DOCKER_IMAGE_NAME}" || (echo "Image build failed. Check Docker Compose." && exit 1)
+
+//                             # Tag the image
+//                             docker tag ${DOCKER_IMAGE_NAME}:${BUILD_NUMBER} ${DOCKER_IMAGE_NAME}:latest
+
+//                             # Push to Docker Hub
+//                             docker push ${DOCKER_IMAGE_NAME}:${BUILD_NUMBER}
+//                             docker push ${DOCKER_IMAGE_NAME}:latest
+//                         """
+//                     }
+//                 }
+//             }
+//         }
+
+//     }
+// }
