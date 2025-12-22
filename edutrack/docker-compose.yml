@@ -8,7 +8,7 @@ services:
     image: makxies24/edutrack:${TAG:-latest}
     container_name: edutrack-container
     ports:
-      - "8082:443"       # HTTPS traffic
+      - "9000:9000"       # HTTPS traffic
       # - "8080:80"     # Optional: redirect HTTP to HTTPS
     networks:
       - app-network
@@ -25,6 +25,19 @@ services:
       retries: 3
     restart: always
 
+  web:
+    image: nginx:latest
+    container_name: laravel-vue-nginx
+    ports:
+      - "8081:80"
+    volumes:
+      - ./src:/var/www/html
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - app
+    networks:
+      - laravel
+
   db:
     image: mariadb:10.5
     container_name: mariadb-edutrack
@@ -33,7 +46,7 @@ services:
       - MYSQL_USER=root
       - MYSQL_ALLOW_EMPTY_PASSWORD="yes"
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
       - db_data:/var/lib/mysql
     networks:
