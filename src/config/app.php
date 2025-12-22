@@ -13,7 +13,7 @@ return [
     |
     */
 
-    'name' => env('APP_NAME', 'CHCCI'),
+    'name' => env('APP_NAME', 'Laravel'),
 
     /*
     |--------------------------------------------------------------------------
@@ -52,7 +52,6 @@ return [
     |
     */
 
-    // 'url' => env('APP_URL', 'https://6840-136-158-117-248.ngrok-free.app'),
     'url' => env('APP_URL', 'http://localhost'),
 
     /*
@@ -66,9 +65,7 @@ return [
     |
     */
 
-    // 'timezone' => 'UTC',
-    'timezone' => env('APP_TIMEZONE', 'Asia/Manila'),
-
+    'timezone' => 'UTC',
 
     /*
     |--------------------------------------------------------------------------
@@ -104,7 +101,7 @@ return [
 
     'previous_keys' => [
         ...array_filter(
-            explode(',', env('APP_PREVIOUS_KEYS', ''))
+            explode(',', (string) env('APP_PREVIOUS_KEYS', ''))
         ),
     ],
 
