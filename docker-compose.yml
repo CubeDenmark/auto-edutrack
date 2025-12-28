@@ -6,7 +6,7 @@ services:
     volumes:
       - ./src:/var/www/html
     ports:
-      - "9000:9000"
+      - "9001:9001"
     networks:
       - laravel
 
@@ -34,7 +34,7 @@ services:
     volumes:
       - db-data:/var/lib/mysql
     ports:
-      - "3307:3306"
+      - "3306:3306"
     networks:
       - laravel
 
