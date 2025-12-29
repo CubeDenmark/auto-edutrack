@@ -1,6 +1,6 @@
 FROM php:8.2-fpm
 
-# Install required dependencies
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     git \
     unzip \
@@ -10,10 +10,17 @@ RUN apt-get update && apt-get install -y \
     libxml2-dev \
     zip \
     libzip-dev \
-    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip
+    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd
+
+# Install Node.js 18
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+    && apt-get install -y nodejs
 
 # Install Composer
 COPY --from=composer:2.6 /usr/bin/composer /usr/bin/composer
 
-# Set working directory
 WORKDIR /var/www/html
+
+# Set entrypoint
+# Uncomment the line that start with "ENTRYPOINT" if you need to migrate or reset the database
+ENTRYPOINT ["/var/www/html/docker-entrypoint.sh"]
