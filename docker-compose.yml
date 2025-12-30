@@ -2,19 +2,15 @@ services:
   app:
     build:
       context: ./docker/php
-    container_name: laravel-vue-app
+    container_name: laravel-app
     volumes:
       - ./src:/var/www/html
-    environment:
-      - APP_KEY=${APP_KEY}
-    ports:
-      - "9001:9001"
     networks:
       - laravel
 
   web:
-    image: nginx:latest
-    container_name: laravel-vue-nginx
+    image: nginx:alpine
+    container_name: laravel-nginx
     ports:
       - "8081:80"
     volumes:
@@ -25,32 +21,35 @@ services:
     networks:
       - laravel
 
-  db:
-    image: mariadb:10.5
-    container_name: laravel-vue-db
-    environment:
-      - MYSQL_DATABASE=edutrack
-      - MYSQL_USER=root
-      - MYSQL_ALLOW_EMPTY_PASSWORD="yes"
-    ports:
-      - "3306:3306"
+  node:
+    image: node:20-alpine
+    container_name: laravel-node
+    working_dir: /var/www/html
     volumes:
-      - db_data:/var/lib/mysql
+      - ./src:/var/www/html
+    command: sh -c "npm install && npm run dev"
+    ports:
+      - "5173:5173"
     networks:
       - laravel
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-    restart: always
+
+  db:
+    image: mysql:8.0
+    container_name: laravel-db
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: laravel
+      MYSQL_USER: laravel
+      MYSQL_PASSWORD: laravel
+    ports:
+      - "3307:3306"
+    volumes:
+      - db-data:/var/lib/mysql
+    networks:
+      - laravel
+
+volumes:
+  db-data:
 
 networks:
   laravel:
-    driver: bridge
-
-volumes:
-  db_data:
-    driver: local
-  app_data:
-    driver: local
