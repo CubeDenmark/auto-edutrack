@@ -1,6 +1,5 @@
 FROM php:8.2-fpm
 
-# Install required dependencies
 RUN apt-get update && apt-get install -y \
     git \
     unzip \
@@ -8,16 +7,12 @@ RUN apt-get update && apt-get install -y \
     libpng-dev \
     libonig-dev \
     libxml2-dev \
-    zip \
     libzip-dev \
-    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip
+    zip \
+    && docker-php-ext-install pdo_mysql mbstring bcmath gd zip
 
-# Install Composer
-COPY --from=composer:2.6 /usr/bin/composer /usr/bin/composer
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# Set working directory
 WORKDIR /var/www/html
 
-# Set entrypoint
-# Uncomment the line that start with "ENTRYPOINT" if you need to migrate or reset the database
-# ENTRYPOINT ["/var/www/html/docker-entrypoint.sh"]
+RUN chown -R www-data:www-data /var/www/html
