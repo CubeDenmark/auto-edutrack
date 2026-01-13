@@ -1,5 +1,6 @@
 FROM php:8.4-fpm
 
+# System dependencies
 RUN apt-get update && apt-get install -y \
     git \
     unzip \
@@ -9,28 +10,21 @@ RUN apt-get update && apt-get install -y \
     libxml2-dev \
     libzip-dev \
     zip \
-    && docker-php-ext-install pdo_mysql mbstring bcmath gd zip
+    && docker-php-ext-install pdo_mysql mbstring bcmath gd zip \
+    && rm -rf /var/lib/apt/lists/*
 
+# Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
 
-# Create required Laravel directories
-RUN mkdir -p \
-    storage/framework/cache \
-    storage/framework/views \
-    storage/framework/sessions \
-    bootstrap/cache
+# Copy app into image (CI / PROD)
+COPY --chown=www-data:www-data edutrack/ .
 
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
-    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+# Laravel writable dirs
+RUN mkdir -p storage framework bootstrap/cache \
+    && chown -R www-data:www-data storage bootstrap/cache \
+    && chmod -R 775 storage bootstrap/cache
 
-RUN chown -R www-data:www-data /var/www/html
-
-ARG UID=1000
-ARG GID=1000
-
-RUN groupadd -g ${GID} appgroup \
-    && useradd -u ${UID} -g appgroup -m appuser
-
-USER appuser
+# Use non-root (industry standard)
+USER www-data
