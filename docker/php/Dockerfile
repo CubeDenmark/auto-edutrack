@@ -26,3 +26,11 @@ RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cac
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
 RUN chown -R www-data:www-data /var/www/html
+
+ARG UID=1000
+ARG GID=1000
+
+RUN groupadd -g ${GID} appgroup \
+    && useradd -u ${UID} -g appgroup -m appuser
+
+USER appuser
