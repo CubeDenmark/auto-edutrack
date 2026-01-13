@@ -69,6 +69,7 @@ pipeline {
 
 
                     sh """
+                        docker exec ${CONTAINER_NAME} composer install
                         docker exec ${CONTAINER_NAME} php artisan config:clear
                         docker exec ${CONTAINER_NAME} php artisan cache:clear
                     """
