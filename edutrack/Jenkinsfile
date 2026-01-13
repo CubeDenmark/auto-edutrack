@@ -44,19 +44,19 @@ pipeline {
                         docker compose -f ${COMPOSE_FILE} up -d
                     """
 
-                    timeout(time: 120, unit: 'SECONDS') {
-                        waitUntil {
-                            def status = sh(script: "docker inspect -f '{{.State.Status}}' ${CONTAINER_NAME}", returnStdout: true).trim()
-                            return status == "running"
-                        }
-                    }
+                    // timeout(time: 120, unit: 'SECONDS') {
+                    //     waitUntil {
+                    //         def status = sh(script: "docker inspect -f '{{.State.Status}}' ${CONTAINER_NAME}", returnStdout: true).trim()
+                    //         return status == "running"
+                    //     }
+                    // }
 
-                    timeout(time: 120, unit: 'SECONDS') {
-                        waitUntil {
-                            def appReady = sh(script: "docker exec ${CONTAINER_NAME} curl -ks -o /dev/null -w '%{http_code}' https://localhost || true", returnStdout: true).trim()
-                            return appReady == "200"
-                        }
-                    }
+                    // timeout(time: 120, unit: 'SECONDS') {
+                    //     waitUntil {
+                    //         def appReady = sh(script: "docker exec ${CONTAINER_NAME} curl -ks -o /dev/null -w '%{http_code}' https://localhost || true", returnStdout: true).trim()
+                    //         return appReady == "200"
+                    //     }
+                    // }
 
                     echo "✅ Edutrack is up and running with HTTPS!"
                 }
@@ -66,14 +66,14 @@ pipeline {
         stage('Send Email') {
             steps {
                 script {
-                    def ngrok_url = "https://edutrack.space"
+
 
                     sh """
                         docker exec ${CONTAINER_NAME} php artisan config:clear
                         docker exec ${CONTAINER_NAME} php artisan cache:clear
                     """
 
-                    sh "docker exec ${CONTAINER_NAME} php artisan ngrok:send-url --url='${ngrok_url}'"
+
                 }
             }
         }
