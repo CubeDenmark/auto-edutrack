@@ -27,11 +27,10 @@ RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cac
 
 RUN chown -R www-data:www-data /var/www/html
 
-# Copy existing application directory permissions
-COPY --chown=www-data:www-data ./edutrack /var/www/html
+ARG UID=1000
+ARG GID=1000
 
-# Change ownership of the storage and cache
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+RUN groupadd -g ${GID} appgroup \
+    && useradd -u ${UID} -g appgroup -m appuser
 
-# Change permissions of the storage and cache
-RUN chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+USER appuser
