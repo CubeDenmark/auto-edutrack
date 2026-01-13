@@ -68,10 +68,6 @@ pipeline {
                 script {
                     def ngrok_url = "https://edutrack.space"
 
-                    sh """
-                        docker exec ${CONTAINER_NAME} php artisan config:clear
-                        docker exec ${CONTAINER_NAME} php artisan cache:clear
-                    """
 
                     sh "docker exec ${CONTAINER_NAME} php artisan ngrok:send-url --url='${ngrok_url}'"
                 }
