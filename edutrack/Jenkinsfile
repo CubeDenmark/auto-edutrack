@@ -66,18 +66,34 @@ pipeline {
         stage('Send Email') {
             steps {
                 script {
-
+                    def ngrok_url = "https://edutrack.space"
 
                     sh """
-                        docker exec ${CONTAINER_NAME} composer install
                         docker exec ${CONTAINER_NAME} php artisan config:clear
                         docker exec ${CONTAINER_NAME} php artisan cache:clear
                     """
 
-
+                    sh "docker exec ${CONTAINER_NAME} php artisan ngrok:send-url --url='${ngrok_url}'"
                 }
             }
         }
+
+        // stage('Send Email') {
+        //     steps {
+        //         script {
+        //             def ngrok_url = "https://edutrack.space"
+
+        //             sh """
+        //                 docker exec ${CONTAINER_NAME} sh -c "chown -R www-data:www-data storage bootstrap/cache && chmod -R 775 storage bootstrap/cache"
+        //                 docker exec ${CONTAINER_NAME} php artisan migrate
+        //                 docker exec ${CONTAINER_NAME} php artisan config:clear
+        //                 docker exec ${CONTAINER_NAME} php artisan cache:clear
+        //             """
+
+        //             sh "docker exec ${CONTAINER_NAME} php artisan ngrok:send-url --url='${ngrok_url}'"
+        //         }
+        //     }
+        // }
 
 
         // stage('Fetch Ngrok URL and Send Email') {

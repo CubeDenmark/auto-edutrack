@@ -22,7 +22,7 @@ RUN mkdir -p \
     storage/framework/sessions \
     bootstrap/cache
 
-# Set correct ownership
-RUN chown -R www-data:www-data storage bootstrap/cache
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
+    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
 RUN chown -R www-data:www-data /var/www/html
