@@ -27,4 +27,4 @@ RUN mkdir -p storage framework bootstrap/cache \
     && chmod -R 775 storage bootstrap/cache
 
 # Use non-root (industry standard)
-USER www-data
+# USER www-data
